@@ -39,7 +39,7 @@ func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx
 
 func (k *KeyCloakClient) getToken() error {
 	if k.AccessToken != "" || k.TokenTime == 0 || k.TokenTime > int(time.Now().Unix()) {
-		accessString, err := k.getGenericToken(k.Realm, k.Username, k.Password)
+		accessString, err := k.GetGenericToken(k.Realm, k.Username, k.Password)
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ func (k *KeyCloakClient) getToken() error {
 	return nil
 }
 
-func (k *KeyCloakClient) getGenericToken(realm, username, password string) (accessTokenString string, err error) {
+func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (accessTokenString string, err error) {
 	headers := map[string]string{
 		"Content-type": "application/x-www-form-urlencoded",
 	}
