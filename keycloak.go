@@ -151,7 +151,7 @@ type Realm struct {
 
 type RealmResponse []Realm
 
-func (k *KeyCloakClient) doesRealmExist(requestedRealmName string) (bool, error) {
+func (k *KeyCloakClient) DoesRealmExist(requestedRealmName string) (bool, error) {
 	resp, err := k.Get("/auth/admin/realms", "", make(map[string]string))
 
 	if err != nil {
