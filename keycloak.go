@@ -17,68 +17,79 @@ type KeyCloakClient struct {
 	Username    string
 	Password    string
 	AccessToken string
+	Realm       string
+	TokenTime   int
 	Ctx         context.Context
 	Log         logr.Logger
 }
 
-func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx context.Context, Log logr.Logger) (*KeyCloakClient, error) {
+func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx context.Context, Realm string, Log logr.Logger) (*KeyCloakClient, error) {
 	log := Log.WithValues("subsystem", "KeyCloakClient")
 	client := KeyCloakClient{
 		BaseURL:  BaseUrl,
 		Username: Username,
 		Password: Password,
 		Ctx:      BaseCtx,
+		Realm:    Realm,
 		Log:      log,
 	}
-	err := client.init()
-	if err != nil {
-		return nil, err
-	}
+
 	return &client, nil
 }
 
-type AuthStruct struct {
-	AccessToken string `json:"access_token"`
+func (k *KeyCloakClient) getToken() error {
+	if k.AccessToken != "" || k.TokenTime == 0 || k.TokenTime > int(time.Now().Unix()) {
+		accessString, err := k.getGenericToken(k.Realm, k.Username, k.Password)
+		if err != nil {
+			return err
+		}
+		k.AccessToken = accessString
+		k.TokenTime = int(time.Now().Unix()) + 45
+	}
+	return nil
 }
 
-func (k *KeyCloakClient) init() error {
-
+func (k *KeyCloakClient) getGenericToken(realm, username, password string) (accessTokenString string, err error) {
 	headers := map[string]string{
 		"Content-type": "application/x-www-form-urlencoded",
 	}
 
-	resp, err := k.rawMethod(
-		"POST",
-		"/auth/realms/master/protocol/openid-connect/token",
-		fmt.Sprintf(
-			"grant_type=password&client_id=admin-cli&username=%s&password=%s",
-			k.Username,
-			k.Password,
-		),
-		headers,
-	)
+	urlPath := fmt.Sprintf("/auth/realms/%s/protocol/openid-connect/token", realm)
+	body := fmt.Sprintf("grant_type=password&client_id=admin-cli&username=%s&password=%s", username, password)
+
+	resp, err := k.rawMethod("POST", urlPath, body, headers)
 	if err != nil {
-		return err
+		return "", err
 	}
+	fmt.Printf("%v", resp)
+	var iface interface{}
 
-	respObj := &AuthStruct{}
-
-	data, err := ioutil.ReadAll(resp.Body)
+	err = json.NewDecoder(resp.Body).Decode(&iface)
 
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	json.Unmarshal(data, respObj)
+	auth, ok := iface.(map[string]interface{})
 
-	k.AccessToken = respObj.AccessToken
+	if !ok {
+		return "", fmt.Errorf("could not get auth info")
+	}
 
-	return nil
+	accessToken, ok := auth["access_token"]
+
+	if !ok {
+		return "", fmt.Errorf("could not get access token")
+	}
+
+	accessTokenString = accessToken.(string)
+
+	return accessTokenString, nil
 }
 
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
 	fullUrl := fmt.Sprintf("%s%s", k.BaseURL, url)
-
+	fmt.Printf("\n\n%v\n%v\n%v\n%v\n\n", fullUrl, body, headers, method)
 	ctx, cancel := context.WithTimeout(k.Ctx, 10*time.Second)
 	defer cancel()
 
@@ -106,17 +117,29 @@ func (k *KeyCloakClient) rawMethod(method string, url string, body string, heade
 }
 
 func (k *KeyCloakClient) Get(url string, body string, headers map[string]string) (*http.Response, error) {
+	err := k.getToken()
+	if err != nil {
+		return nil, err
+	}
 	headers["Authorization"] = fmt.Sprintf("Bearer %s", k.AccessToken)
 	return k.rawMethod("GET", url, body, headers)
 }
 
 func (k *KeyCloakClient) Post(url string, body string, headers map[string]string) (*http.Response, error) {
+	err := k.getToken()
+	if err != nil {
+		return nil, err
+	}
 	headers["Authorization"] = fmt.Sprintf("Bearer %s", k.AccessToken)
 
 	return k.rawMethod("POST", url, body, headers)
 }
 
 func (k *KeyCloakClient) Put(url string, body string, headers map[string]string) (*http.Response, error) {
+	err := k.getToken()
+	if err != nil {
+		return nil, err
+	}
 	headers["Authorization"] = fmt.Sprintf("Bearer %s", k.AccessToken)
 
 	return k.rawMethod("PUT", url, body, headers)
@@ -162,7 +185,7 @@ type Client struct {
 
 type ClientResponse []Client
 
-func (k *KeyCloakClient) doesClientExist(realm string, requestedClientName string) (bool, error) {
+func (k *KeyCloakClient) DoesClientExist(realm string, requestedClientName string) (bool, error) {
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/clients", realm), "", make(map[string]string))
 
 	if err != nil {
@@ -196,7 +219,7 @@ type User struct {
 
 type UserResponse []User
 
-func (k *KeyCloakClient) doesUserExist(realm string, requestedUsername string) (bool, *updateUserStruct, error) {
+func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (bool, *updateUserStruct, error) {
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/users", realm), "", make(map[string]string))
 
 	if err != nil {
@@ -283,7 +306,7 @@ type createRealmStruct struct {
 	ID      string `json:"id"`
 }
 
-func (k *KeyCloakClient) createRealm(requestedRealmName string) error {
+func (k *KeyCloakClient) CreateRealm(requestedRealmName string) error {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
@@ -361,7 +384,7 @@ type clientStruct struct {
 	DirectAccessGrantsEnabled bool           `json:"directAccessGrantsEnabled"`
 }
 
-func (k *KeyCloakClient) createClient(realmName, clientName, envName string) error {
+func (k *KeyCloakClient) CreateClient(realmName, clientName, envName string) error {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
@@ -411,7 +434,7 @@ func (k *KeyCloakClient) createClient(realmName, clientName, envName string) err
 	return nil
 }
 
-func (k *KeyCloakClient) createUser(realmName string, user *createUserStruct) error {
+func (k *KeyCloakClient) CreateUser(realmName string, user *createUserStruct) error {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
@@ -436,7 +459,7 @@ func (k *KeyCloakClient) createUser(realmName string, user *createUserStruct) er
 	return nil
 }
 
-func (k *KeyCloakClient) putUser(realmName string, user *updateUserStruct) error {
+func (k *KeyCloakClient) PutUser(realmName string, user *updateUserStruct) error {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
