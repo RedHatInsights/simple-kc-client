@@ -247,17 +247,17 @@ func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (
 	return false, nil, nil
 }
 
-type createUserStruct struct {
+type CreateUserStruct struct {
 	Enabled     bool              `json:"enabled"`
 	Username    string            `json:"username"`
 	FirstName   string            `json:"firstName"`
 	LastName    string            `json:"lastName"`
 	Email       string            `json:"email"`
-	Attributes  userAttributes    `json:"attributes"`
-	Credentials []userCredentials `json:"credentials"`
+	Attributes  UserAttributes    `json:"attributes"`
+	Credentials []UserCredentials `json:"credentials"`
 }
 
-type userAttributes struct {
+type UserAttributes struct {
 	FirstName       string `json:"first_name"`
 	LastName        string `json:"last_name"`
 	AccountID       string `json:"account_id"`
@@ -278,7 +278,7 @@ type updateUserStruct struct {
 	LastName    string               `json:"lastName"`
 	Email       string               `json:"email"`
 	Attributes  updateUserAttributes `json:"attributes"`
-	Credentials []userCredentials    `json:"credentials"`
+	Credentials []UserCredentials    `json:"credentials"`
 }
 
 type updateUserAttributes struct {
@@ -294,7 +294,7 @@ type updateUserAttributes struct {
 	NewEntitlements []string `json:"newEntitlements"`
 }
 
-type userCredentials struct {
+type UserCredentials struct {
 	Temporary bool   `json:"temporary"`
 	Type      string `json:"type"`
 	Value     string `json:"value"`
@@ -434,7 +434,7 @@ func (k *KeyCloakClient) CreateClient(realmName, clientName, envName string) err
 	return nil
 }
 
-func (k *KeyCloakClient) CreateUser(realmName string, user *createUserStruct) error {
+func (k *KeyCloakClient) CreateUser(realmName string, user *CreateUserStruct) error {
 	headers := map[string]string{
 		"Content-Type": "application/json",
 	}
