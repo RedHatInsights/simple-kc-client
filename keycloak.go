@@ -61,7 +61,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("%v", resp)
+
 	var iface interface{}
 
 	err = json.NewDecoder(resp.Body).Decode(&iface)
@@ -89,7 +89,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
 	fullUrl := fmt.Sprintf("%s%s", k.BaseURL, url)
-	fmt.Printf("\n\n%v\n%v\n%v\n%v\n\n", fullUrl, body, headers, method)
+
 	ctx, cancel := context.WithTimeout(k.Ctx, 10*time.Second)
 	defer cancel()
 
