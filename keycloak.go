@@ -41,7 +41,7 @@ func (k *KeyCloakClient) getToken() error {
 	if k.AccessToken != "" || k.TokenTime == 0 || k.TokenTime > int(time.Now().Unix()) {
 		accessString, err := k.GetGenericToken(k.Realm, k.Username, k.Password)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not get token: %w", err)
 		}
 		k.AccessToken = accessString
 		k.TokenTime = int(time.Now().Unix()) + 45
@@ -59,7 +59,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 
 	resp, err := k.rawMethod("POST", urlPath, body, headers)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error calling gettoken post: %w", err)
 	}
 
 	var iface interface{}
@@ -67,7 +67,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 	err = json.NewDecoder(resp.Body).Decode(&iface)
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not decode JSON: %w", err)
 	}
 
 	auth, ok := iface.(map[string]interface{})
@@ -97,17 +97,21 @@ func (k *KeyCloakClient) rawMethod(method string, url string, body string, heade
 
 	req, err := http.NewRequestWithContext(ctx, method, fullUrl, r)
 
-	for k, v := range headers {
-		req.Header.Set(k, v)
+	if err != nil {
+		return nil, fmt.Errorf("error creating new context: %w", err)
 	}
 
-	if err != nil {
-		return nil, err
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 
 	if err != nil {
+		if resp != nil && resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			return nil, fmt.Errorf("error in contacting server: %s: %w", v, err)
+		}
 		return nil, err
 	}
 
@@ -155,24 +159,20 @@ func (k *KeyCloakClient) DoesRealmExist(requestedRealmName string) (bool, error)
 	resp, err := k.Get("/auth/admin/realms", "", make(map[string]string))
 
 	if err != nil {
-		if resp.Body != nil {
-			return false, err
-		} else {
-			return false, fmt.Errorf("unspecified error")
-		}
+		return false, fmt.Errorf("bad response: %w", err)
 	}
 
 	iface := &RealmResponse{}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("could not read body: %w", err)
 	}
 
 	err = json.Unmarshal(data, iface)
 
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("could not unmarshal json: %w", err)
 	}
 
 	for _, realm := range *iface {
@@ -193,24 +193,20 @@ func (k *KeyCloakClient) DoesClientExist(realm string, requestedClientName strin
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/clients", realm), "", make(map[string]string))
 
 	if err != nil {
-		if resp.Body != nil {
-			return false, err
-		} else {
-			return false, fmt.Errorf("unspecified error")
-		}
+		return false, fmt.Errorf("error checking if client exists: %w", err)
 	}
 
 	iface := &ClientResponse{}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("could not read body: %w", err)
 	}
 
 	err = json.Unmarshal(data, iface)
 
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("could not unmarshal json: %w", err)
 	}
 
 	for _, client := range *iface {
@@ -231,26 +227,20 @@ func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/users", realm), "", make(map[string]string))
 
 	if err != nil {
-		if resp.Body != nil {
-			v, _ := ioutil.ReadAll(resp.Body)
-			k.Log.Error(err, string(v))
-			return false, nil, err
-		} else {
-			return false, nil, fmt.Errorf("unspecified error")
-		}
+		return false, nil, fmt.Errorf("error checking if user exists: %w", err)
 	}
 
 	iface := &[]updateUserStruct{}
 
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("could not read body: %w", err)
 	}
 
 	err = json.Unmarshal(data, iface)
 
 	if err != nil {
-		return false, nil, err
+		return false, nil, fmt.Errorf("could not unmarshal json: %w", err)
 	}
 
 	for _, user := range *iface {
@@ -334,19 +324,13 @@ func (k *KeyCloakClient) CreateRealm(requestedRealmName string) error {
 	b, err := json.Marshal(postObj)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("could not marshall json: %w", err)
 	}
 
-	resp, err := k.Post("/auth/admin/realms", string(b), headers)
+	_, err = k.Post("/auth/admin/realms", string(b), headers)
 
 	if err != nil {
-		if resp.Body != nil {
-			v, _ := ioutil.ReadAll(resp.Body)
-			k.Log.Error(err, string(v))
-			return err
-		} else {
-			return fmt.Errorf("unspecified error")
-		}
+		return fmt.Errorf("could not create realm: %w", err)
 	}
 
 	return nil
@@ -438,19 +422,13 @@ func (k *KeyCloakClient) CreateClient(realmName, clientName, envName string) err
 		return err
 	}
 
-	resp, err := k.Post(
+	_, err = k.Post(
 		fmt.Sprintf("/auth/admin/realms/%s/clients", realmName),
 		string(b), headers,
 	)
 
 	if err != nil {
-		if resp.Body != nil {
-			v, _ := ioutil.ReadAll(resp.Body)
-			k.Log.Error(err, string(v))
-			return err
-		} else {
-			return fmt.Errorf("unspecified error")
-		}
+		return fmt.Errorf("could not create client: %w", err)
 	}
 
 	return nil
@@ -464,22 +442,16 @@ func (k *KeyCloakClient) CreateUser(realmName string, user *CreateUserStruct) er
 	b, err := json.Marshal(user)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshalling user json: %w", err)
 	}
 
-	resp, err := k.Post(
+	_, err = k.Post(
 		fmt.Sprintf("/auth/admin/realms/%s/users", realmName),
 		string(b), headers,
 	)
 
 	if err != nil {
-		if resp.Body != nil {
-			v, _ := ioutil.ReadAll(resp.Body)
-			k.Log.Error(err, string(v))
-			return err
-		} else {
-			return fmt.Errorf("unspecified error")
-		}
+		return fmt.Errorf("could not create user: %w", err)
 	}
 
 	return nil
@@ -496,19 +468,13 @@ func (k *KeyCloakClient) PutUser(realmName string, user *updateUserStruct) error
 		return err
 	}
 
-	resp, err := k.Put(
+	_, err = k.Put(
 		fmt.Sprintf("/auth/admin/realms/%s/users/%s", realmName, user.ID),
 		string(b), headers,
 	)
 
 	if err != nil {
-		if resp.Body != nil {
-			v, _ := ioutil.ReadAll(resp.Body)
-			k.Log.Error(err, string(v))
-			return err
-		} else {
-			return fmt.Errorf("unspecified error")
-		}
+		return fmt.Errorf("could not update user: %w", err)
 	}
 
 	return nil
