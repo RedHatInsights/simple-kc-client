@@ -155,7 +155,11 @@ func (k *KeyCloakClient) DoesRealmExist(requestedRealmName string) (bool, error)
 	resp, err := k.Get("/auth/admin/realms", "", make(map[string]string))
 
 	if err != nil {
-		return false, err
+		if resp.Body != nil {
+			return false, err
+		} else {
+			return false, fmt.Errorf("unspecified error")
+		}
 	}
 
 	iface := &RealmResponse{}
@@ -189,7 +193,11 @@ func (k *KeyCloakClient) DoesClientExist(realm string, requestedClientName strin
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/clients", realm), "", make(map[string]string))
 
 	if err != nil {
-		return false, err
+		if resp.Body != nil {
+			return false, err
+		} else {
+			return false, fmt.Errorf("unspecified error")
+		}
 	}
 
 	iface := &ClientResponse{}
@@ -223,7 +231,13 @@ func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (
 	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/users", realm), "", make(map[string]string))
 
 	if err != nil {
-		return false, nil, err
+		if resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			k.Log.Error(err, string(v))
+			return false, nil, err
+		} else {
+			return false, nil, fmt.Errorf("unspecified error")
+		}
 	}
 
 	iface := &[]updateUserStruct{}
@@ -326,9 +340,13 @@ func (k *KeyCloakClient) CreateRealm(requestedRealmName string) error {
 	resp, err := k.Post("/auth/admin/realms", string(b), headers)
 
 	if err != nil {
-		v, _ := ioutil.ReadAll(resp.Body)
-		k.Log.Error(err, string(v))
-		return err
+		if resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			k.Log.Error(err, string(v))
+			return err
+		} else {
+			return fmt.Errorf("unspecified error")
+		}
 	}
 
 	return nil
@@ -426,9 +444,13 @@ func (k *KeyCloakClient) CreateClient(realmName, clientName, envName string) err
 	)
 
 	if err != nil {
-		v, _ := ioutil.ReadAll(resp.Body)
-		k.Log.Error(err, string(v))
-		return err
+		if resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			k.Log.Error(err, string(v))
+			return err
+		} else {
+			return fmt.Errorf("unspecified error")
+		}
 	}
 
 	return nil
@@ -451,9 +473,13 @@ func (k *KeyCloakClient) CreateUser(realmName string, user *CreateUserStruct) er
 	)
 
 	if err != nil {
-		v, _ := ioutil.ReadAll(resp.Body)
-		k.Log.Error(err, string(v))
-		return err
+		if resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			k.Log.Error(err, string(v))
+			return err
+		} else {
+			return fmt.Errorf("unspecified error")
+		}
 	}
 
 	return nil
@@ -476,9 +502,13 @@ func (k *KeyCloakClient) PutUser(realmName string, user *updateUserStruct) error
 	)
 
 	if err != nil {
-		v, _ := ioutil.ReadAll(resp.Body)
-		k.Log.Error(err, string(v))
-		return err
+		if resp.Body != nil {
+			v, _ := ioutil.ReadAll(resp.Body)
+			k.Log.Error(err, string(v))
+			return err
+		} else {
+			return fmt.Errorf("unspecified error")
+		}
 	}
 
 	return nil
