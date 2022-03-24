@@ -54,7 +54,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 		"Content-type": "application/x-www-form-urlencoded",
 	}
 
-	urlPath := fmt.Sprintf("/auth/realms/%s/protocol/openid-connect/token", realm)
+	urlPath := fmt.Sprintf("/realms/%s/protocol/openid-connect/token", realm)
 	body := fmt.Sprintf("grant_type=password&client_id=admin-cli&username=%s&password=%s", username, password)
 
 	resp, err := k.rawMethod("POST", urlPath, body, headers)
@@ -90,12 +90,9 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
 	fullUrl := fmt.Sprintf("%s%s", k.BaseURL, url)
 
-	ctx, cancel := context.WithTimeout(k.Ctx, 10*time.Second)
-	defer cancel()
-
 	r := strings.NewReader(body)
 
-	req, err := http.NewRequestWithContext(ctx, method, fullUrl, r)
+	req, err := http.NewRequest(method, fullUrl, r)
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating new context: %w", err)
@@ -104,6 +101,9 @@ func (k *KeyCloakClient) rawMethod(method string, url string, body string, heade
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
+
+	client := http.DefaultClient
+	client.Timeout = time.Duration(10 * time.Second)
 
 	resp, err := http.DefaultClient.Do(req)
 
@@ -156,7 +156,7 @@ type Realm struct {
 type RealmResponse []Realm
 
 func (k *KeyCloakClient) DoesRealmExist(requestedRealmName string) (bool, error) {
-	resp, err := k.Get("/auth/admin/realms", "", make(map[string]string))
+	resp, err := k.Get("/admin/realms", "", make(map[string]string))
 
 	if err != nil {
 		return false, fmt.Errorf("bad response: %w", err)
@@ -190,7 +190,7 @@ type Client struct {
 type ClientResponse []Client
 
 func (k *KeyCloakClient) DoesClientExist(realm string, requestedClientName string) (bool, error) {
-	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/clients", realm), "", make(map[string]string))
+	resp, err := k.Get(fmt.Sprintf("/admin/realms/%s/clients", realm), "", make(map[string]string))
 
 	if err != nil {
 		return false, fmt.Errorf("error checking if client exists: %w", err)
@@ -224,7 +224,7 @@ type User struct {
 type UserResponse []User
 
 func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (bool, *updateUserStruct, error) {
-	resp, err := k.Get(fmt.Sprintf("/auth/admin/realms/%s/users", realm), "", make(map[string]string))
+	resp, err := k.Get(fmt.Sprintf("/admin/realms/%s/users", realm), "", make(map[string]string))
 
 	if err != nil {
 		return false, nil, fmt.Errorf("error checking if user exists: %w", err)
@@ -233,6 +233,9 @@ func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (
 	iface := &[]updateUserStruct{}
 
 	data, err := ioutil.ReadAll(resp.Body)
+
+	k.Log.Info(fmt.Sprintf("%s - %s", data, fmt.Sprintf("/admin/realms/%s/users", realm)))
+
 	if err != nil {
 		return false, nil, fmt.Errorf("could not read body: %w", err)
 	}
@@ -327,7 +330,7 @@ func (k *KeyCloakClient) CreateRealm(requestedRealmName string) error {
 		return fmt.Errorf("could not marshall json: %w", err)
 	}
 
-	_, err = k.Post("/auth/admin/realms", string(b), headers)
+	_, err = k.Post("/admin/realms", string(b), headers)
 
 	if err != nil {
 		return fmt.Errorf("could not create realm: %w", err)
@@ -423,7 +426,7 @@ func (k *KeyCloakClient) CreateClient(realmName, clientName, envName string) err
 	}
 
 	_, err = k.Post(
-		fmt.Sprintf("/auth/admin/realms/%s/clients", realmName),
+		fmt.Sprintf("/admin/realms/%s/clients", realmName),
 		string(b), headers,
 	)
 
@@ -446,7 +449,7 @@ func (k *KeyCloakClient) CreateUser(realmName string, user *CreateUserStruct) er
 	}
 
 	_, err = k.Post(
-		fmt.Sprintf("/auth/admin/realms/%s/users", realmName),
+		fmt.Sprintf("/admin/realms/%s/users", realmName),
 		string(b), headers,
 	)
 
@@ -469,7 +472,7 @@ func (k *KeyCloakClient) PutUser(realmName string, user *updateUserStruct) error
 	}
 
 	_, err = k.Put(
-		fmt.Sprintf("/auth/admin/realms/%s/users/%s", realmName, user.ID),
+		fmt.Sprintf("/admin/realms/%s/users/%s", realmName, user.ID),
 		string(b), headers,
 	)
 
