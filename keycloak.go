@@ -233,9 +233,6 @@ func (k *KeyCloakClient) DoesUserExist(realm string, requestedUsername string) (
 	iface := &[]updateUserStruct{}
 
 	data, err := ioutil.ReadAll(resp.Body)
-
-	k.Log.Info(fmt.Sprintf("%s - %s", data, fmt.Sprintf("/admin/realms/%s/users", realm)))
-
 	if err != nil {
 		return false, nil, fmt.Errorf("could not read body: %w", err)
 	}
