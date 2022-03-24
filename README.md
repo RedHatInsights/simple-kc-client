@@ -1,7 +1,8 @@
 Simple KC Client
 ================
 
-Simple KC client is used in the Clowder operator and the crc caddy side car.
+Simple KC client is used in the Clowder operator, mocktitlements and mbop.
+
 Please see the table below for compatibility
 
 | SKC Version | Keycloak supported version |
