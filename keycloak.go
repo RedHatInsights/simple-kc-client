@@ -21,10 +21,12 @@ type KeyCloakClient struct {
 	TokenTime   int
 	Ctx         context.Context
 	Log         logr.Logger
+	Version     string
 }
 
-func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx context.Context, Realm string, Log logr.Logger) (*KeyCloakClient, error) {
+func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx context.Context, Realm string, Log logr.Logger, version string) (*KeyCloakClient, error) {
 	log := Log.WithValues("subsystem", "KeyCloakClient")
+	version = fmt.Sprintf("v%s", version)
 	client := KeyCloakClient{
 		BaseURL:  BaseUrl,
 		Username: Username,
@@ -32,6 +34,7 @@ func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx
 		Ctx:      BaseCtx,
 		Realm:    Realm,
 		Log:      log,
+		Version:  version,
 	}
 
 	return &client, nil
@@ -88,7 +91,11 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 }
 
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
-	fullUrl := fmt.Sprintf("%s%s", k.BaseURL, url)
+	authString := ""
+	if k.Version > "v16.0.0" {
+		authString = "/auth"
+	}
+	fullUrl := fmt.Sprintf("%s%s%s", k.BaseURL, authString, url)
 
 	r := strings.NewReader(body)
 
