@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"golang.org/x/mod/semver"
 )
 
 type KeyCloakClient struct {
@@ -92,7 +93,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
 	authString := ""
-	if k.Version > "v16.0.0" {
+	if semver.Compare(k.Version, "v16.0.0") >= 0 {
 		authString = "/auth"
 	}
 	fullUrl := fmt.Sprintf("%s%s%s", k.BaseURL, authString, url)
