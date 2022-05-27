@@ -25,6 +25,13 @@ type KeyCloakClient struct {
 	Version     string
 }
 
+type JSONStruct struct {
+	PublicKey       string `json:"public_key"`
+	TokenService    string `json:"token-service"`
+	AccountService  string `json:"account-service"`
+	TokensNotBefore int    `json:"tokens-not-before"`
+}
+
 func NewKeyCloakClient(BaseUrl string, Username string, Password string, BaseCtx context.Context, Realm string, Log logr.Logger, version string) (*KeyCloakClient, error) {
 	log := Log.WithValues("subsystem", "KeyCloakClient")
 	version = fmt.Sprintf("v%s", version)
@@ -93,7 +100,7 @@ func (k *KeyCloakClient) GetGenericToken(realm, username, password string) (acce
 
 func (k *KeyCloakClient) rawMethod(method string, url string, body string, headers map[string]string) (*http.Response, error) {
 	authString := ""
-	if semver.Compare(k.Version, "v16.0.0") >= 0 {
+	if semver.Compare(k.Version, "v16.0.0") < 0 {
 		authString = "/auth"
 	}
 	fullUrl := fmt.Sprintf("%s%s%s", k.BaseURL, authString, url)
@@ -463,6 +470,27 @@ func (k *KeyCloakClient) CreateUser(realmName string, user *CreateUserStruct) er
 	}
 
 	return nil
+}
+
+func (k *KeyCloakClient) GetJWT(realm string) (*JSONStruct, error) {
+	resp, err := k.rawMethod("GET", fmt.Sprintf("/realms/%s/", realm), "", nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	bdata, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	jsonstruct := &JSONStruct{}
+	err = json.Unmarshal(bdata, jsonstruct)
+	if err != nil {
+		return nil, err
+	}
+
+	return jsonstruct, nil
 }
 
 func (k *KeyCloakClient) PutUser(realmName string, user *updateUserStruct) error {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/go-logr/logr"
@@ -20,7 +21,7 @@ func (suite *TestSuite) SetupSuite() {
 
 func (suite *TestSuite) TestOldVersionPath() {
 	k8sServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
+		if r.URL.Path == "/auth/" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -41,7 +42,7 @@ func (suite *TestSuite) TestOldVersionPath() {
 
 func (suite *TestSuite) TestNewVersionPath() {
 	k8sServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/auth/" {
+		if r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusBadRequest)
@@ -58,6 +59,29 @@ func (suite *TestSuite) TestNewVersionPath() {
 
 	assert.Nil(suite.T(), err, "error was not nil")
 	assert.Equal(suite.T(), resp.StatusCode, 200, "status code not good")
+}
+
+func (suite *TestSuite) TestGetRealmJWTPath() {
+	testData, _ := os.ReadFile("testdata/jwt.json")
+	k8sServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/realms/testrealm/" {
+			w.WriteHeader(http.StatusOK)
+			w.Write(testData)
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer k8sServer.Close()
+
+	ctx := context.Background()
+	logger := logr.Discard()
+	newKCClient, err := NewKeyCloakClient(k8sServer.URL, "test", "test", ctx, "testrealm", logger, "17.0.0")
+	assert.Nil(suite.T(), err, "error was not nil")
+
+	resp, err := newKCClient.GetJWT("testrealm")
+
+	assert.Nil(suite.T(), err, "error was not nil")
+	assert.Equal(suite.T(), "testkey", resp.PublicKey, "key does not match")
 }
 
 func (suite *TestSuite) TearDownSuite() {
