@@ -1,0 +1,1 @@
+{"realm":"testrealm","public_key":"testkey","token-service":"https://testdomain/auth/realms/testrealm/protocol/openid-connect","account-service":"https://testdomain/auth/realms/testrealm/account","tokens-not-before":0}
