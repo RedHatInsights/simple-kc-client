@@ -1,3 +1,6 @@
+This project is now archived and is no longer used!
+---------------------------------------------------
+
 Simple KC Client
 ================
 
